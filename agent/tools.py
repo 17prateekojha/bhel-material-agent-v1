@@ -55,3 +55,30 @@ def search_by_description(keyword: str) -> str:
             f"{m.description} | Supplier={m.supplier}"
             for m in rows
         )
+@tool
+def search_materials_received_today() -> str:
+    """Find all materials whose receipt date is today."""
+    from datetime import date
+    from database.models import Material
+
+    today = date.today()
+
+    with SessionLocal() as session:
+        rows = (
+            session.query(Material)
+            .filter(Material.receipt_date == today)
+            .order_by(Material.receipt_date, Material.material_id)
+            .limit(100)
+            .all()
+        )
+
+        if not rows:
+            return f"No materials were received on {today}."
+
+        return "\n".join(
+            f"{m.material_id} | PO={m.po_no} | Item={m.item_code} | "
+            f"{m.description} | Supplier={m.supplier} | "
+            f"Received Qty={m.quantity_received} | "
+            f"Receipt Date={m.receipt_date} | GRN={m.grn_no}"
+            for m in rows
+        )
