@@ -1,77 +1,128 @@
-from datetime import date
-from sqlalchemy import select
-from database.models import Material, MaterialEvent, InsuranceClaim, Survey
+from database.models import Material, MaterialEvent
 
-def next_material_id(session):
-    count = session.query(Material).count() + 1
-    candidate = f"MAT-{count:06d}"
-    while session.query(Material).filter_by(material_id=candidate).first():
-        count += 1
-        candidate = f"MAT-{count:06d}"
-    return candidate
 
 def add_material(session, data):
+    material_id = data.get("material_id")
+
+    if not material_id:
+        last_material = (
+            session.query(Material)
+            .order_by(Material.id.desc())
+            .first()
+        )
+
+        if last_material and last_material.material_id:
+            try:
+                last_number = int(
+                    last_material.material_id.split("-")[-1]
+                )
+                material_id = f"MAT-{last_number + 1:06d}"
+            except (ValueError, IndexError):
+                material_id = "MAT-000001"
+        else:
+            material_id = "MAT-000001"
+
     material = Material(
-        material_id=next_material_id(session),
-        po_no=data["po_no"].strip(),
-        item_code=data["item_code"].strip(),
-        description=data["description"].strip(),
-        quantity_received=float(data["quantity_received"]),
+        material_id=material_id,
+        po_no=data["po_no"],
+        item_code=data["item_code"],
+        description=data["description"],
+        quantity_received=data.get("quantity_received", 0),
         receipt_date=data["receipt_date"],
-        grn_no=data["grn_no"].strip(),
-        store_location=data["store_location"].strip(),
-        supplier=data["supplier"].strip(),
-        remarks=data.get("remarks", "").strip(),
+        grn_no=data["grn_no"],
+        store_location=data["store_location"],
+        supplier=data["supplier"],
+        remarks=data.get("remarks", ""),
     )
+
     session.add(material)
     session.flush()
-    session.add(MaterialEvent(
-        material_id=material.id,
-        event_date=material.receipt_date,
-        event_type="RECEIVED",
-        quantity=material.quantity_received,
-        party=material.supplier,
-        reference_no=material.grn_no,
-        remarks="Initial receipt",
-    ))
-    session.commit()
-    session.refresh(material)
+
     return material
 
-def add_event(session, material_id, event_date, event_type, quantity=0, party="", reference_no="", remarks=""):
-    material = session.query(Material).filter_by(material_id=material_id).first()
-    if not material:
-        raise ValueError(f"Material {material_id} not found")
-    if quantity < 0:
-        raise ValueError("Quantity cannot be negative")
+
+def add_event(
+    session,
+    material_id,
+    event_date,
+    event_type,
+    quantity,
+    party="",
+    reference_no="",
+    remarks="",
+):
+    material = (
+        session.query(Material)
+        .filter(Material.material_id == material_id)
+        .first()
+    )
+
+    if material is None:
+        raise ValueError(
+            f"Material {material_id} not found"
+        )
+
     event = MaterialEvent(
         material_id=material.id,
         event_date=event_date,
         event_type=event_type,
-        quantity=float(quantity),
-        party=party.strip(),
-        reference_no=reference_no.strip(),
-        remarks=remarks.strip(),
+        quantity=quantity,
+        party=party,
+        reference_no=reference_no,
+        remarks=remarks,
     )
+
     session.add(event)
-    session.commit()
+    session.flush()
+
     return event
 
 def material_balance(session, material):
-    events = session.query(MaterialEvent).filter_by(material_id=material.id).all()
-    received = sum(e.quantity for e in events if e.event_type == "RECEIVED")
-    handed_over = sum(e.quantity for e in events if e.event_type == "HANDOVER")
-    damaged = sum(e.quantity for e in events if e.event_type == "DAMAGE")
-    shortage = sum(e.quantity for e in events if e.event_type == "SHORTAGE")
+    events = (
+        session.query(MaterialEvent)
+        .filter_by(material_id=material.id)
+        .all()
+    )
+
+    # Initial receipt comes from the Material master record.
+    received = material.quantity_received or 0
+
+    handed_over = sum(
+        e.quantity for e in events
+        if e.event_type == "HANDOVER"
+    )
+
+    damaged = sum(
+        e.quantity for e in events
+        if e.event_type == "DAMAGE"
+    )
+
+    shortage = sum(
+        e.quantity for e in events
+        if e.event_type == "SHORTAGE"
+    )
+
+    accounted = handed_over + damaged + shortage
+    store = received - accounted
+    difference = received - accounted
+
     return {
         "received": received,
         "handed_over": handed_over,
         "damaged": damaged,
         "shortage": shortage,
-        "accounted": handed_over + damaged + shortage,
-        "store": received - handed_over - damaged - shortage,
-        "difference": received - handed_over - damaged - shortage,
+        "accounted": accounted,
+        "store": store,
+        "difference": difference,
     }
 
+
 def get_all_materials(session):
-    return session.query(Material).order_by(Material.receipt_date.desc(), Material.id.desc()).all()
+    return (
+        session.query(Material)
+        .order_by(
+            Material.receipt_date.desc(),
+            Material.id.desc(),
+        )
+        .all()
+    )
