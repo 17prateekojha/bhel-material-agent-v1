@@ -5,6 +5,9 @@ from sqlalchemy import or_
 
 from agent.graph import ask_agent
 
+from agent.tools import search_materials_received_today
+from services.reconciliation import exceptions
+
 from database.db import SessionLocal, init_db
 from database.models import Material
 
@@ -845,26 +848,20 @@ elif page == "⚠️ Reconciliation":
     st.header("⚠️ Reconciliation Exceptions")
 
     try:
+        with SessionLocal() as session:
+            rows = exceptions(session)
 
-        result = (
-            find_reconciliation_exceptions
-            .invoke({})
-        )
-
-        if result.startswith(
-            "No reconciliation"
-        ):
-
-            st.success(result)
-
+        if not rows:
+            st.success("No reconciliation exceptions found.")
         else:
+            st.error(f"{len(rows)} reconciliation exception(s) found.")
 
-            st.error(result)
+            st.dataframe(
+                rows,
+                use_container_width=True,
+                hide_index=True,
+            )
 
-    except Exception as exc:
-
-        st.error(
-            "Unable to retrieve reconciliation data."
-        )
-
-        st.exception(exc)
+    except Exception as e:
+        st.error("Unable to retrieve reconciliation data.")
+        st.exception(e)
