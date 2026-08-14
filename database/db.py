@@ -1,22 +1,45 @@
-from pathlib import Path
 import os
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from config import get_setting
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
 
-DATABASE_URL = get_setting("DATABASE_URL", f"sqlite:///{DATA_DIR / 'materials.db'}")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./data/materials.db",
+)
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
-class Base(DeclarativeBase):
-    pass
+connect_args = {}
+
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {
+        "check_same_thread": False,
+    }
+
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+)
+
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
+
+Base = declarative_base()
+
 
 def init_db():
-    from database.models import Material, MaterialEvent, InsuranceClaim, Survey
+    """
+    Create all application tables if they do not already exist.
+    Safe to call during application startup.
+    """
+    from database.models import Material, MaterialEvent
+
     Base.metadata.create_all(bind=engine)

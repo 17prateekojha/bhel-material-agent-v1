@@ -4,20 +4,17 @@ from datetime import date
 from sqlalchemy import or_
 
 from agent.graph import ask_agent
-from agent.tools import (
-    search_materials_received_today,
-    find_reconciliation_exceptions,
-)
 
-from database.db import SessionLocal
+from database.db import SessionLocal, init_db
 from database.models import Material
 
 from services.material_service import (
     add_material,
     add_event,
+    material_balance,
 )
 
-from services.material_service import material_balance
+init_db()
 
 
 # =========================================================
@@ -628,7 +625,214 @@ elif page == "📅 Today's Receipts":
 
         st.exception(exc)
 
+# ---------------------------------------------------------
+# TRANSACTIONS
+# ---------------------------------------------------------
 
+elif page == "🔄 Transactions":
+
+    st.header("🔄 Material Transaction Management")
+
+    st.caption(
+        "Record material handover, damage, shortage, or additional receipt."
+    )
+
+    with SessionLocal() as session:
+
+        materials = (
+            session.query(Material)
+            .order_by(Material.material_id)
+            .all()
+        )
+
+        if not materials:
+
+            st.info(
+                "No materials are available. "
+                "Please add a material first."
+            )
+
+        else:
+
+            material_options = {
+                m.material_id: m
+                for m in materials
+            }
+
+            selected_material_id = st.selectbox(
+                "Material ID",
+                options=list(material_options.keys()),
+            )
+
+            material = material_options[selected_material_id]
+
+            balance = material_balance(
+                session,
+                material,
+            )
+
+            st.subheader("Current Balance")
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.metric(
+                    "Received",
+                    balance["received"],
+                )
+
+            with col2:
+                st.metric(
+                    "Handed Over",
+                    balance["handed_over"],
+                )
+
+            with col3:
+                st.metric(
+                    "Damaged",
+                    balance["damaged"],
+                )
+
+            with col4:
+                st.metric(
+                    "Store Balance",
+                    balance["store"],
+                )
+
+            st.divider()
+
+            st.subheader("Record Transaction")
+
+            event_type = st.selectbox(
+                "Transaction Type",
+                [
+                    "HANDOVER",
+                    "DAMAGE",
+                    "SHORTAGE",
+                    "RECEIVED",
+                ],
+            )
+
+            quantity = st.number_input(
+                "Quantity",
+                min_value=0.01,
+                value=1.0,
+                step=1.0,
+            )
+
+            event_date = st.date_input(
+                "Transaction Date",
+                value=date.today(),
+            )
+
+            party = st.text_input(
+                "Party / Contractor / Recipient"
+            )
+
+            reference_no = st.text_input(
+                "Reference No."
+            )
+
+            remarks = st.text_area(
+                "Remarks"
+            )
+
+            available = balance["store"]
+
+            if event_type != "RECEIVED":
+
+                st.info(
+                    f"Available store balance: {available}"
+                )
+
+                if quantity > available:
+
+                    st.error(
+                        f"Quantity exceeds available balance "
+                        f"({available})."
+                    )
+
+            if st.button(
+                "Save Transaction",
+                type="primary",
+                use_container_width=True,
+            ):
+
+                try:
+
+                    event = add_event(
+                        session=session,
+                        material_id=selected_material_id,
+                        event_date=event_date,
+                        event_type=event_type,
+                        quantity=quantity,
+                        party=party,
+                        reference_no=reference_no,
+                        remarks=remarks,
+                    )
+
+                    st.success(
+                        f"{event_type} transaction of "
+                        f"{quantity} recorded successfully."
+                    )
+
+                    st.rerun()
+
+                except ValueError as exc:
+
+                    st.error(str(exc))
+
+                except Exception as exc:
+
+                    session.rollback()
+
+                    st.error(
+                        "Unable to save transaction."
+                    )
+
+                    st.exception(exc)
+
+            st.divider()
+
+            st.subheader("Transaction History")
+
+            events = (
+                session.query(MaterialEvent)
+                .filter(
+                    MaterialEvent.material_id == material.id
+                )
+                .order_by(
+                    MaterialEvent.event_date.desc(),
+                    MaterialEvent.id.desc(),
+                )
+                .all()
+            )
+
+            if events:
+
+                transaction_data = [
+                    {
+                        "Date": e.event_date,
+                        "Type": e.event_type,
+                        "Quantity": e.quantity,
+                        "Party": e.party,
+                        "Reference": e.reference_no,
+                        "Remarks": e.remarks,
+                    }
+                    for e in events
+                ]
+
+                st.dataframe(
+                    transaction_data,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+            else:
+
+                st.info(
+                    "No transactions recorded."
+                )
 # =========================================================
 # RECONCILIATION
 # =========================================================
