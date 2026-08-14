@@ -8,13 +8,16 @@ from agent.graph import ask_agent
 from database.db import SessionLocal, init_db
 from database.models import Material
 
+# Initialize database before any database query
+init_db()
+
 from services.material_service import (
     add_material,
     add_event,
     material_balance,
 )
 
-init_db()
+
 
 
 # =========================================================
