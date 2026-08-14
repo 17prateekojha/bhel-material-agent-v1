@@ -52,26 +52,22 @@ if logo_path.exists():
 
     st.markdown(
         f"""
-        <style>
-        .bhel-logo {{
+        <div style="
             position: fixed;
-            top: 15px;
-            right: 25px;
-            width: 95px;
-            height: 95px;
-            object-fit: contain;
-            background: white;
-            padding: 5px;
-            border-radius: 8px;
+            top: 10px;
+            right: 20px;
             z-index: 999999;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.20);
-        }}
-        </style>
-
-        <img
-            class="bhel-logo"
-            src="data:image/jpeg;base64,{logo_base64}"
-        >
+            background-color: white;
+            padding: 6px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        ">
+            <img
+                src="data:image/jpeg;base64,{logo_base64}"
+                width="90"
+                style="display:block;"
+            >
+        </div>
         """,
         unsafe_allow_html=True,
     )
