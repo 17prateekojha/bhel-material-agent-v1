@@ -1,18 +1,19 @@
 import streamlit as st
 from datetime import date
+from pathlib import Path
+import base64
 
 from sqlalchemy import or_
 
 from agent.graph import ask_agent
 
-from agent.tools import search_materials_received_today
-from services.reconciliation import exceptions
+from agent.tools import (
+    search_materials_received_today,
+    find_reconciliation_exceptions,
+)
 
 from database.db import SessionLocal, init_db
 from database.models import Material
-
-# Initialize database before any database query
-init_db()
 
 from services.material_service import (
     add_material,
@@ -20,7 +21,11 @@ from services.material_service import (
     material_balance,
 )
 
+# =========================================================
+# DATABASE INITIALIZATION
+# =========================================================
 
+init_db()
 
 
 # =========================================================
@@ -29,12 +34,47 @@ from services.material_service import (
 
 st.set_page_config(
     page_title="BHEL Material Management",
-    page_icon="📦",
+    page_icon="B",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+# =========================================================
+# BHEL LOGO
+# =========================================================
 
+logo_path = Path(__file__).parent / "assets" / "BHEL_logo.jpg"
+
+if logo_path.exists():
+    logo_base64 = base64.b64encode(
+        logo_path.read_bytes()
+    ).decode("utf-8")
+
+    st.markdown(
+        f"""
+        <style>
+        .bhel-logo {{
+            position: fixed;
+            top: 15px;
+            right: 25px;
+            width: 95px;
+            height: 95px;
+            object-fit: contain;
+            background: white;
+            padding: 5px;
+            border-radius: 8px;
+            z-index: 999999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.20);
+        }}
+        </style>
+
+        <img
+            class="bhel-logo"
+            src="data:image/jpeg;base64,{logo_base64}"
+        >
+        """,
+        unsafe_allow_html=True,
+    )
 # =========================================================
 # HEADER
 # =========================================================
@@ -45,10 +85,6 @@ st.caption(
     "BHEL TBG HVDC Nagpur | Material Receipt, Store Balance, "
     "Handover & Reconciliation"
 )
-
-st.divider()
-
-
 # =========================================================
 # SIDEBAR
 # =========================================================
