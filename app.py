@@ -13,12 +13,16 @@ from agent.tools import (
 )
 
 from database.db import SessionLocal, init_db
-from database.models import Material
+from database.models import Material, MaterialEvent
 
 from services.material_service import (
     add_material,
     add_event,
     material_balance,
+)
+
+from services.excel_report_service import (
+    generate_material_status_report,
 )
 
 # =========================================================
@@ -154,7 +158,7 @@ if page == "🤖 AI Assistant":
 # =========================================================
 
 elif page == "📊 Dashboard":
-
+    
     st.header("📊 Material Management Dashboard")
 
     with SessionLocal() as session:
@@ -291,6 +295,50 @@ elif page == "📊 Dashboard":
         x="Category",
         y="Quantity",
     )
+
+    # -----------------------------------------------------
+    # EXCEL REPORT
+    # -----------------------------------------------------
+
+    st.divider()
+
+    st.subheader("📥 Material Status Excel Report")
+
+    try:
+        with SessionLocal() as session:
+
+            materials = (
+                session.query(Material)
+                .order_by(Material.material_id)
+                .all()
+            )
+
+            transactions = (
+                session.query(MaterialEvent)
+                .order_by(MaterialEvent.event_date)
+                .all()
+            )
+
+            excel_file = generate_material_status_report(
+                materials=materials,
+                transactions=transactions,
+            )
+
+        st.download_button(
+            label="📊 Download Updated Material Status Excel",
+            data=excel_file,
+            file_name="BHEL_Material_Status_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+    except Exception as e:
+
+        st.error(
+            f"Unable to generate Excel report: {e}"
+        )
 
 
 # =========================================================
@@ -897,3 +945,46 @@ elif page == "⚠️ Reconciliation":
     except Exception as e:
         st.error("Unable to retrieve reconciliation data.")
         st.exception(e)
+# =========================================================
+# EXCEL REPORT
+# =========================================================
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Excel Reporting")
+
+if st.sidebar.button("📊 Generate Material Status Report"):
+
+    db = SessionLocal()
+
+    try:
+        materials = db.query(Material).all()
+
+        report_file = generate_material_status_report(
+            materials=materials,
+        )
+
+        st.sidebar.download_button(
+            label="📥 Download Material Status Excel",
+            data=report_file,
+            file_name=(
+                "BHEL_Material_Status_"
+                + date.today().strftime("%Y%m%d")
+                + ".xlsx"
+            ),
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+        st.sidebar.success(
+            "Excel report generated successfully."
+        )
+
+    except Exception as e:
+        st.sidebar.error(
+            f"Unable to generate Excel report: {e}"
+        )
+
+    finally:
+        db.close()
