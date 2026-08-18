@@ -24,14 +24,6 @@ from services.material_service import (
 from services.excel_report_service import (
     generate_material_status_report,
 )
-
-# =========================================================
-# DATABASE INITIALIZATION
-# =========================================================
-
-init_db()
-
-
 # =========================================================
 # PAGE CONFIG
 # =========================================================
@@ -42,6 +34,148 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# =========================================================
+# DATABASE INITIALIZATION
+# =========================================================
+
+init_db()
+
+# =========================================================
+# APPLICATION ASSETS
+# =========================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+
+background_path = (
+    BASE_DIR
+    / "assets"
+    / "BHEL"
+    / "hvdc_substation.jpg"
+)
+# =========================================================
+# HVDC SUBSTATION - WHITE CORPORATE BACKGROUND
+# =========================================================
+
+if background_path.exists():
+
+    with open(background_path, "rb") as image_file:
+        encoded_background = base64.b64encode(
+            image_file.read()
+        ).decode()
+
+    st.markdown(
+        f"""
+        <style>
+
+        /* =================================================
+           MAIN APPLICATION BACKGROUND
+           ================================================= */
+
+        .stApp {{
+            background-color: #ffffff;
+
+            background-image:
+                linear-gradient(
+                    rgba(255, 255, 255, 0.94),
+                    rgba(255, 255, 255, 0.94)
+                ),
+                url(
+                    "data:image/jpeg;base64,{encoded_background}"
+                );
+
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }}
+
+
+        /* =================================================
+           MAIN CONTENT AREA
+           ================================================= */
+
+        .block-container {{
+            background: rgba(255, 255, 255, 0.92);
+
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+
+            border-radius: 10px;
+        }}
+
+
+        /* =================================================
+           SIDEBAR
+           ================================================= */
+
+        section[data-testid="stSidebar"] {{
+            background-color: #f5f7fa;
+            border-right: 1px solid #d9dee5;
+        }}
+
+
+        /* =================================================
+           HEADINGS
+           ================================================= */
+
+        h1, h2, h3 {{
+            color: #1f2937;
+        }}
+
+
+        /* =================================================
+           METRIC CARDS
+           ================================================= */
+
+        div[data-testid="stMetric"] {{
+            background-color: rgba(255, 255, 255, 0.96);
+
+            border: 1px solid #d9dee5;
+            border-radius: 10px;
+
+            padding: 15px;
+
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.06);
+        }}
+
+
+        /* =================================================
+           DATA TABLE
+           ================================================= */
+
+        div[data-testid="stDataFrame"] {{
+            background-color: rgba(255, 255, 255, 0.97);
+
+            border-radius: 8px;
+        }}
+
+
+        /* =================================================
+           BUTTONS
+           ================================================= */
+
+        .stDownloadButton button {{
+            border-radius: 6px;
+            font-weight: 600;
+        }}
+
+
+        /* =================================================
+           REMOVE EXCESS TOP SPACE
+           ================================================= */
+
+        header[data-testid="stHeader"] {{
+            background-color: rgba(255, 255, 255, 0.96);
+        }}
+
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # =========================================================
 # BHEL LOGO
